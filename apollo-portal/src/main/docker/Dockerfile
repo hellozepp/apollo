@@ -18,31 +18,33 @@
 # 2. Build with: mvn docker:build -pl apollo-portal
 # 3. Run with: docker run -p 8070:8070 -e SPRING_DATASOURCE_URL="jdbc:mysql://fill-in-the-correct-server:3306/ApolloPortalDB?characterEncoding=utf8" -e SPRING_DATASOURCE_USERNAME=FillInCorrectUser -e SPRING_DATASOURCE_PASSWORD=FillInCorrectPassword -e APOLLO_PORTAL_ENVS=dev,pro -e DEV_META=http://fill-in-dev-meta-server:8080 -e PRO_META=http://fill-in-pro-meta-server:8080 -d -v /tmp/logs:/opt/logs --name apollo-portal apolloconfig/apollo-portal
 
-FROM zetta-docker-repository-registry.cn-beijing.cr.aliyuncs.com/zetta-studio/debian:12-slim
+FROM zetta-docker-repository-registry.cn-beijing.cr.aliyuncs.com/zetta-studio/debian:12-slim AS app
 
 ARG VERSION
 ENV VERSION $VERSION
 
 COPY apollo-portal-${VERSION}-github.zip /apollo-portal/apollo-portal-${VERSION}-github.zip
 
-RUN unzip /apollo-portal/apollo-portal-${VERSION}-github.zip -d /apollo-portal \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && unzip /apollo-portal/apollo-portal-${VERSION}-github.zip -d /apollo-portal \
     && rm -rf /apollo-portal/apollo-portal-${VERSION}-github.zip \
     && chmod +x /apollo-portal/scripts/startup.sh
 
-FROM openjdk:8-jre-slim
+FROM eclipse-temurin:17-jre-jammy
 LABEL maintainer="g632104866@gmail.com;finchcn@gmail.com;ameizi<sxyx2008@163.com>"
 
 ENV APOLLO_RUN_MODE "Docker"
 ENV SERVER_PORT 8070
 
-RUN echo "deb http://mirrors.aliyun.com/debian/ bullseye main non-free contrib" > /etc/apt/sources.list \
-    && echo "deb http://mirrors.aliyun.com/debian-security/ bullseye-security main" >> /etc/apt/sources.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends procps curl bash tzdata \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends procps curl bash tzdata \
+    && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 
-COPY --from=0 /apollo-portal /apollo-portal
+COPY --from=app /apollo-portal /apollo-portal
 
 EXPOSE $SERVER_PORT
 
